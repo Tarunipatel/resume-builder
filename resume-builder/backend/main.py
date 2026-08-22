@@ -11,17 +11,24 @@ from dotenv import load_dotenv
 
 from parser import parse_cv
 from screener import screen_cv
-from improver import improve_cv
-from pdf_generator import generate_pdf
-from models import BatchScreenResult, ImprovedCV, MatchLevel, ScreenedCV
+# from improver import improve_cv
+from mock_data import mock_screen_cv  # , mock_improve_cv
+from pdf_generator import generate_report_pdf
+from models import BatchScreenResult, MatchLevel, ScreenedCV
 
 load_dotenv()
 
-app = FastAPI(title="Placement Cell Resume Builder")
+MOCK_MODE = os.getenv("MOCK_MODE", "false").lower() == "true"
+
+DEFAULT_ORIGINS = ["http://localhost:5173", "http://localhost:3000"]
+extra_origins = os.getenv("ALLOWED_ORIGINS", "")
+ALLOWED_ORIGINS = DEFAULT_ORIGINS + [o.strip() for o in extra_origins.split(",") if o.strip()]
+
+app = FastAPI(title="Orca")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -53,20 +60,22 @@ async def screen_cvs(
 ):
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded.")
-    if len(files) > 50:
-        raise HTTPException(status_code=400, detail="Maximum 50 CVs per batch.")
+    if len(files) > 200:
+        raise HTTPException(status_code=400, detail="Maximum 200 CVs per batch.")
     if not job_description.strip():
         raise HTTPException(status_code=400, detail="Job description cannot be empty.")
 
-    client = get_client()
+    client = None if MOCK_MODE else get_client()
     # Higher concurrency for screening — haiku is fast and cheap
-    semaphore = asyncio.Semaphore(8)
+    semaphore = asyncio.Semaphore(15)
 
     async def screen_one(file: UploadFile) -> ScreenedCV:
         async with semaphore:
             contents = await file.read()
             try:
                 parsed = parse_cv(file.filename, contents)
+                if MOCK_MODE:
+                    return mock_screen_cv(parsed, job_description)
                 loop = asyncio.get_event_loop()
                 return await loop.run_in_executor(None, screen_cv, client, parsed, job_description)
             except Exception as e:
@@ -101,34 +110,50 @@ async def screen_cvs(
     )
 
 
-# ── Phase 3: Improve a single CV (called per-card for 50-70% tier) ──
-@app.post("/api/improve-one", response_model=ImprovedCV)
-async def improve_one(
-    job_description: str = Form(...),
-    filename: str = Form(...),
-    cv_text: str = Form(...),
-):
-    if not cv_text.strip():
-        raise HTTPException(status_code=400, detail="CV text is empty.")
+# ── Phase 3: Improve a single CV — disabled for now, replaced by the ────
+# ── analysis report below (see /api/report-pdf).                     ──
+# @app.post("/api/improve-one", response_model=ImprovedCV)
+# async def improve_one(
+#     job_description: str = Form(...),
+#     filename: str = Form(...),
+#     cv_text: str = Form(...),
+# ):
+#     if not cv_text.strip():
+#         raise HTTPException(status_code=400, detail="CV text is empty.")
+#
+#     if MOCK_MODE:
+#         return mock_improve_cv(cv_text, filename, job_description)
+#
+#     client = get_client()
+#     loop = asyncio.get_event_loop()
+#     try:
+#         result = await loop.run_in_executor(None, improve_cv, client, cv_text, filename, job_description)
+#         return result
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+#
+#
+# @app.post("/api/single-pdf")
+# async def single_pdf(student_name: str = Form(...), improved_text: str = Form(...)):
+#     pdf_bytes = generate_pdf(improved_text, student_name)
+#     safe_name = student_name.replace(" ", "_").replace("/", "-")
+#     return StreamingResponse(
+#         io.BytesIO(pdf_bytes),
+#         media_type="application/pdf",
+#         headers={"Content-Disposition": f"attachment; filename={safe_name}_improved.pdf"},
+#     )
 
-    client = get_client()
-    loop = asyncio.get_event_loop()
-    try:
-        result = await loop.run_in_executor(None, improve_cv, client, cv_text, filename, job_description)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
-
-# ── PDF generation ───────────────────────────────────────────────────
-@app.post("/api/single-pdf")
-async def single_pdf(student_name: str = Form(...), improved_text: str = Form(...)):
-    pdf_bytes = generate_pdf(improved_text, student_name)
-    safe_name = student_name.replace(" ", "_").replace("/", "-")
+# ── Phase 3: Downloadable analysis report from Phase 1 screening ────────
+@app.post("/api/report-pdf")
+async def report_pdf(screen_result: BatchScreenResult):
+    pdf_bytes = generate_report_pdf(screen_result)
+    safe_title = screen_result.job_title.encode("ascii", "ignore").decode().replace(" ", "_").replace("/", "-")[:50]
+    safe_title = safe_title.strip("_") or "cv_analysis_report"
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={safe_name}_improved.pdf"},
+        headers={"Content-Disposition": f"attachment; filename={safe_title}_cv_analysis_report.pdf"},
     )
 
 

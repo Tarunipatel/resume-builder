@@ -53,7 +53,7 @@ def improve_cv(client: anthropic.Anthropic, cv_text: str, filename: str, job_des
 
     if before >= 70:
         level = MatchLevel.strong
-    elif before >= 50:
+    elif before >= 35:
         level = MatchLevel.partial
     else:
         level = MatchLevel.poor

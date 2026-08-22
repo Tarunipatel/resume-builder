@@ -21,16 +21,19 @@ Return this exact JSON structure:
   "match_level": "strong" | "partial" | "poor",
   "why_strong": ["reason the CV already fits the role", ...],
   "suggestions": ["specific change that would improve the match", ...],
+  "matched_keywords": ["important JD keyword found in the CV", ...],
   "missing_keywords": ["important JD keyword missing from CV", ...]
 }}
 
 Scoring guide:
 - 70 to 100 (strong): Student has most required skills and relevant experience. Minor gaps only.
-- 50 to 69 (partial): Some relevant skills but clear gaps that are addressable through edits.
-- 0 to 49 (poor): Missing core requirements. Would need significant upskilling, not just a CV edit.
+- 35 to 69 (partial): Some relevant skills but clear gaps that are addressable through edits.
+- 0 to 34 (poor): Missing core requirements. Would need significant upskilling, not just a CV edit.
 
 why_strong should list 2-4 concrete things already in the CV that match the JD.
 suggestions should list 2-5 specific, actionable edits the student could make to improve their score.
+matched_keywords should list the important JD terms (skills, tools, qualifications) that ARE present in the CV
+  and contributed positively to the score — this is what the student should point to as evidence of fit.
 missing_keywords should list the important JD terms completely absent from this CV.
 """
 
@@ -58,7 +61,7 @@ def screen_cv(client: anthropic.Anthropic, parsed: ParsedCV, job_description: st
     # Derive match_level from score in case model is inconsistent
     if score >= 70:
         level = MatchLevel.strong
-    elif score >= 50:
+    elif score >= 35:
         level = MatchLevel.partial
     else:
         level = MatchLevel.poor
@@ -73,5 +76,6 @@ def screen_cv(client: anthropic.Anthropic, parsed: ParsedCV, job_description: st
         match_level=level,
         why_strong=data.get("why_strong", []),
         suggestions=data.get("suggestions", []),
+        matched_keywords=data.get("matched_keywords", []),
         missing_keywords=data.get("missing_keywords", []),
     )

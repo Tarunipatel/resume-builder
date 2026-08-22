@@ -28,6 +28,7 @@ class ScreenedCV(BaseModel):
     match_level: MatchLevel
     why_strong: list[str]         # what already matches
     suggestions: list[str]        # what to improve (shown for partial tier)
+    matched_keywords: list[str] = []  # JD keywords found in the CV, drove the score up
     missing_keywords: list[str]
     error: Optional[str] = None
 

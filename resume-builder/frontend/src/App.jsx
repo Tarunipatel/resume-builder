@@ -1,8 +1,8 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import axios from 'axios'
 import './App.css'
 
-const API = 'http://localhost:8000'
+const API = import.meta.env.VITE_API_URL || 'http://localhost:8001'
 
 // ── Helpers ───────────────────────────────────────────────────────────
 function fmt(bytes) {
@@ -14,14 +14,40 @@ function initials(name) {
   return name.split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase()
 }
 
+// ── Scroll reveal wrapper — fades + lifts children in once, on scroll ───
+function Reveal({ children, index = 0, className = '' }) {
+  const ref = useRef(null)
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const io = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) { setVisible(true); io.disconnect() }
+    }, { threshold: 0.15 })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
+
+  return (
+    <div
+      ref={ref}
+      className={`reveal ${visible ? 'is-visible' : ''} ${className}`}
+      style={{ transitionDelay: `${index * 0.08}s` }}
+    >
+      {children}
+    </div>
+  )
+}
+
 // ── Score ring ────────────────────────────────────────────────────────
 function ScoreRing({ score }) {
   const r = 20, circ = 2 * Math.PI * r
   const offset = circ - (score / 100) * circ
-  const color = score >= 70 ? '#2e7d52' : score >= 50 ? '#b07d1a' : '#b94040'
+  const color = score >= 70 ? '#34D399' : score >= 35 ? '#E4BC66' : '#F87171'
   return (
     <svg width="52" height="52" style={{ flexShrink: 0 }}>
-      <circle cx="26" cy="26" r={r} fill="none" stroke="#e8e2d9" strokeWidth="3.5" />
+      <circle cx="26" cy="26" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3.5" />
       <circle
         cx="26" cy="26" r={r} fill="none"
         stroke={color} strokeWidth="3.5"
@@ -29,14 +55,15 @@ function ScoreRing({ score }) {
         strokeLinecap="round" transform="rotate(-90 26 26)"
         style={{ transition: 'stroke-dashoffset 0.8s ease' }}
       />
-      <text x="26" y="31" textAnchor="middle" fontSize="12" fontWeight="800" fill={color} fontFamily="Inter,sans-serif">
+      <text x="26" y="31" textAnchor="middle" fontSize="12" fontWeight="800" fill={color} fontFamily="'Plus Jakarta Sans',sans-serif">
         {score}
       </text>
     </svg>
   )
 }
 
-// ── Diff modal ────────────────────────────────────────────────────────
+// ── Diff modal — only used by the disabled ImprovePage, see below ───────
+/*
 function DiffModal({ result, originalText, onClose }) {
   return (
     <div className="overlay" onClick={onClose}>
@@ -66,12 +93,13 @@ function DiffModal({ result, originalText, onClose }) {
     </div>
   )
 }
+*/
 
 // ── Topbar stepper ────────────────────────────────────────────────────
 const STEPS = [
   { num: 1, label: 'Upload & Screen' },
   { num: 2, label: 'Review Results'  },
-  { num: 3, label: 'Improve CVs'     },
+  { num: 3, label: 'Download Report' },
 ]
 
 function Topbar({ step, screenResult, onGoto }) {
@@ -79,7 +107,7 @@ function Topbar({ step, screenResult, onGoto }) {
     <header className="topbar">
       <div className="topbar-brand">
         <span className="brand-dot" />
-        PlacementCV
+        Orca
       </div>
 
       <nav className="stepper">
@@ -88,11 +116,8 @@ function Topbar({ step, screenResult, onGoto }) {
           const isActive = step === s.num
           const isLocked = step < s.num
 
-          // Step 2 clickable if screened, step 3 clickable if screened + partial cvs exist
-          const canClick = isDone || (
-            s.num === 2 && screenResult ||
-            s.num === 3 && screenResult?.results.some(r => r.match_level === 'partial' && !r.error)
-          )
+          // Steps 2 and 3 are both unlocked as soon as screening has run
+          const canClick = isDone || ((s.num === 2 || s.num === 3) && screenResult)
 
           return (
             <div key={s.num} className="step-item">
@@ -148,7 +173,7 @@ function UploadPage({ files, setFiles, jd, setJd, onScreen, loading, progress })
           <div className="card-head">
             <div className="card-step">Upload</div>
             <h3>Student CVs</h3>
-            <p>PDF or DOCX, up to 50 files at once</p>
+            <p>PDF or DOCX, up to 200 files at once</p>
           </div>
           <div className="card-body">
             <div
@@ -236,7 +261,7 @@ function UploadPage({ files, setFiles, jd, setJd, onScreen, loading, progress })
 }
 
 // ── Step 2: Ranked Results ────────────────────────────────────────────
-function ResultsPage({ screenResult, onGoImprove, onReset }) {
+function ResultsPage({ screenResult, onGoReport, onReset }) {
   const strong  = screenResult.results.filter(r => r.match_level === 'strong'  && !r.error)
   const partial = screenResult.results.filter(r => r.match_level === 'partial' && !r.error)
   const poor    = screenResult.results.filter(r => r.match_level === 'poor'    && !r.error)
@@ -254,11 +279,11 @@ function ResultsPage({ screenResult, onGoImprove, onReset }) {
   return (
     <div className="page-content">
       <div className="page-header">
-        <div className="page-eyebrow">Step 2 of 3 — {screenResult.job_title}</div>
-        <h1 className="page-title">Ranked results — <em>{screenResult.screened} CVs screened</em></h1>
+        <div className="page-eyebrow">Step 2 of 3: {screenResult.job_title}</div>
+        <h1 className="page-title">Ranked results: <em>{screenResult.screened} CVs screened</em></h1>
         <p className="page-sub">
           CVs are sorted best-to-worst against the job description. Strong fits are ready to go.
-          The middle group needs targeted edits — you can improve those on the next step.
+          Download the full analysis as a report on the next step.
         </p>
       </div>
 
@@ -271,12 +296,12 @@ function ResultsPage({ screenResult, onGoImprove, onReset }) {
         <div className="summary-tile summary-partial">
           <div className="summary-num">{partial.length}</div>
           <div className="summary-lbl">Worth improving</div>
-          <div className="summary-range">Score 50 to 69</div>
+          <div className="summary-range">Score 35 to 69</div>
         </div>
         <div className="summary-tile summary-poor">
           <div className="summary-num">{poor.length}</div>
           <div className="summary-lbl">Poor fit</div>
-          <div className="summary-range">Score below 50</div>
+          <div className="summary-range">Score below 35</div>
         </div>
       </div>
 
@@ -286,7 +311,7 @@ function ResultsPage({ screenResult, onGoImprove, onReset }) {
             <span className="tier-dot t-strong" />
             <span className="tier-title">Strong fits</span>
             <span className="tier-count">{strong.length}</span>
-            <span className="tier-desc">Ready to send — no edits needed</span>
+            <span className="tier-desc">Ready to send, no edits needed</span>
           </div>
           <div className="cv-list">
             {strong.map(cv => (
@@ -305,6 +330,13 @@ function ResultsPage({ screenResult, onGoImprove, onReset }) {
                       {w}
                     </div>
                   ))}
+                  {cv.matched_keywords?.length > 0 && (
+                    <div className="tag-row" style={{ marginTop: 6 }}>
+                      {cv.matched_keywords.slice(0, 6).map((k, i) => (
+                        <span key={i} className="tag matched">{k}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="cv-card-right">
                   <span className="tier-badge badge-strong">Strong fit</span>
@@ -322,7 +354,7 @@ function ResultsPage({ screenResult, onGoImprove, onReset }) {
             <span className="tier-dot t-partial" />
             <span className="tier-title">Worth improving</span>
             <span className="tier-count">{partial.length}</span>
-            <span className="tier-desc">Go to Step 3 to rewrite these CVs</span>
+            <span className="tier-desc">See the full breakdown in the Step 3 report</span>
           </div>
           <div className="cv-list">
             {partial.map(cv => (
@@ -335,8 +367,11 @@ function ResultsPage({ screenResult, onGoImprove, onReset }) {
                   </div>
                 </div>
                 <div className="cv-card-mid">
+                  {cv.matched_keywords?.slice(0, 4).map((k, i) => (
+                    <span key={`m-${i}`} className="tag matched" style={{ display: 'inline-block', marginRight: 4, marginBottom: 2 }}>{k}</span>
+                  ))}
                   {cv.missing_keywords.slice(0, 4).map((k, i) => (
-                    <span key={i} className="tag missing" style={{ display: 'inline-block', marginRight: 4, marginBottom: 2 }}>{k}</span>
+                    <span key={`x-${i}`} className="tag missing" style={{ display: 'inline-block', marginRight: 4, marginBottom: 2 }}>{k}</span>
                   ))}
                 </div>
                 <div className="cv-card-right">
@@ -367,7 +402,7 @@ function ResultsPage({ screenResult, onGoImprove, onReset }) {
                   </div>
                 </div>
                 <div className="cv-card-mid">
-                  <span className="poor-note">Missing core requirements — a CV rewrite would not meaningfully help.</span>
+                  <span className="poor-note">Missing core requirements. A CV rewrite would not meaningfully help.</span>
                 </div>
                 <div className="cv-card-right">
                   <span className="tier-badge badge-poor">Poor fit</span>
@@ -404,19 +439,20 @@ function ResultsPage({ screenResult, onGoImprove, onReset }) {
         <div className="page-actions-left">
           <button className="btn btn-outline" onClick={onReset}>Start over</button>
         </div>
-        {partial.length > 0 && (
-          <div className="page-actions-right">
-            <button className="btn btn-primary" onClick={onGoImprove}>
-              Improve {partial.length} CV{partial.length !== 1 ? 's' : ''} in Step 3
-            </button>
-          </div>
-        )}
+        <div className="page-actions-right">
+          <button className="btn btn-primary" onClick={onGoReport}>
+            Download report in Step 3
+          </button>
+        </div>
       </div>
     </div>
   )
 }
 
-// ── Step 3: Improve CVs ───────────────────────────────────────────────
+// ── Step 3: Improve CVs — disabled for now, replaced by the downloadable ──
+// ── analysis report below (ReportPage). Kept here in case we bring back ──
+// ── AI rewriting later.                                                 ──
+/*
 function ImprovePage({ screenResult, jd, onBack }) {
   const partial = screenResult.results.filter(r => r.match_level === 'partial' && !r.error)
   const [improvingId, setImprovingId] = useState(null)
@@ -458,7 +494,7 @@ function ImprovePage({ screenResult, jd, onBack }) {
   return (
     <div className="page-content">
       <div className="page-header">
-        <div className="page-eyebrow">Step 3 of 3 — {screenResult.job_title}</div>
+        <div className="page-eyebrow">Step 3 of 3: {screenResult.job_title}</div>
         <h1 className="page-title">Improve the <em>{partial.length} shortlisted CVs</em></h1>
         <p className="page-sub">
           These CVs have relevant experience but need targeted edits to better match the role.
@@ -548,6 +584,66 @@ function ImprovePage({ screenResult, jd, onBack }) {
     </div>
   )
 }
+*/
+
+// ── Step 3: Downloadable analysis report (from Step 2 screening) ────────
+function ReportPage({ screenResult, onBack }) {
+  const [downloading, setDownloading] = useState(false)
+  const strong  = screenResult.results.filter(r => r.match_level === 'strong'  && !r.error)
+  const partial = screenResult.results.filter(r => r.match_level === 'partial' && !r.error)
+  const poor    = screenResult.results.filter(r => r.match_level === 'poor'    && !r.error)
+
+  const downloadReport = async () => {
+    setDownloading(true)
+    try {
+      const res = await axios.post(`${API}/api/report-pdf`, screenResult, { responseType: 'blob' })
+      const url = URL.createObjectURL(res.data)
+      const safeTitle = screenResult.job_title.replace(/ /g, '_').replace(/\//g, '-')
+      Object.assign(document.createElement('a'), {
+        href: url, download: `${safeTitle}_cv_analysis_report.pdf`
+      }).click()
+      URL.revokeObjectURL(url)
+    } catch {
+      alert('Report download failed.')
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  return (
+    <div className="page-content">
+      <div className="page-header">
+        <div className="page-eyebrow">Step 3 of 3: {screenResult.job_title}</div>
+        <h1 className="page-title">Download the <em>CV analysis report</em></h1>
+        <p className="page-sub">
+          A single PDF with the full screening breakdown from Step 2: every candidate's score,
+          matched and missing keywords, and improvement suggestions, grouped by tier.
+        </p>
+      </div>
+
+      <div className="improve-intro">
+        <div className="improve-intro-icon">📄</div>
+        <p>
+          <strong>What's in the report:</strong> {strong.length} strong fit{strong.length !== 1 ? 's' : ''},{' '}
+          {partial.length} worth improving, and {poor.length} poor fit{poor.length !== 1 ? 's' : ''},
+          each with the reasoning behind their score, ready to share with the placement team.
+        </p>
+      </div>
+
+      <div className="action-bar">
+        <button className="btn btn-primary" onClick={downloadReport} disabled={downloading}>
+          {downloading ? 'Preparing report...' : 'Download analysis report (PDF)'}
+        </button>
+      </div>
+
+      <div className="page-actions">
+        <div className="page-actions-left">
+          <button className="btn btn-outline" onClick={onBack}>Back to results</button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ── Home page ─────────────────────────────────────────────────────────
 const MOCK_CVS = [
@@ -563,8 +659,8 @@ function HomePage({ onLaunch }) {
       {/* Nav */}
       <nav className="home-nav">
         <div className="home-nav-brand">
-          <span className="brand-dot" style={{ background: '#2e7d52' }} />
-          PlacementCV
+          <span className="brand-dot" />
+          Orca
         </div>
         <div className="home-nav-links">
           <button className="home-nav-link" onClick={() => document.getElementById('how').scrollIntoView({ behavior: 'smooth' })}>How it works</button>
@@ -579,13 +675,13 @@ function HomePage({ onLaunch }) {
           <div>
             <span className="hero-kicker">For college placement offices</span>
             <h1 className="home-h1">
-              Screen 50 CVs.<br />
+              Screen 200 CVs.<br />
               In the time it takes to<br />
               <em>read one.</em>
             </h1>
             <p className="home-hero-sub">
-              Upload your student batch, paste a job description, and PlacementCV
-              scores every resume against the role — ranking them into three tiers so
+              Upload your student batch, paste a job description, and Orca
+              scores every resume against the role, ranking them into three tiers so
               you know exactly where to focus.
             </p>
             <div className="home-hero-btns">
@@ -617,27 +713,27 @@ function HomePage({ onLaunch }) {
 
       {/* Stat strip */}
       <div className="stat-strip">
-        <div className="strip-stat"><div className="strip-num">50</div><div className="strip-lbl">CVs per batch</div></div>
-        <div className="strip-stat"><div className="strip-num">3</div><div className="strip-lbl">Tiers — strong, partial, poor</div></div>
-        <div className="strip-stat"><div className="strip-num">PDF</div><div className="strip-lbl">Improved CVs, ready to send</div></div>
+        <div className="strip-stat"><div className="strip-num">200</div><div className="strip-lbl">CVs per batch</div></div>
+        <div className="strip-stat"><div className="strip-num">3</div><div className="strip-lbl">Tiers: strong, partial, poor</div></div>
+        <div className="strip-stat"><div className="strip-num">PDF</div><div className="strip-lbl">Analysis report, ready to share</div></div>
         <div className="strip-stat"><div className="strip-num">0</div><div className="strip-lbl">Manual reviewing needed</div></div>
       </div>
 
       {/* Problem */}
       <section className="problem-section">
-        <div className="problem-inner">
+        <Reveal className="problem-inner">
           <h2>Placement officers shouldn't have to<br /><em>read every CV by hand.</em></h2>
           <p>
             A typical placement batch has 40 to 80 students. A single company visit might
-            bring 3 different roles. That is up to 240 CV reads — before you have even
+            bring 3 different roles. That is up to 240 CV reads, before you have even
             shortlisted anyone.
           </p>
           <p>
-            PlacementCV scores every CV against the job description in one go, shows you
+            Orca scores every CV against the job description in one go, shows you
             who is job-ready, who needs a few edits, and who is genuinely not a fit. Then
-            it rewrites the editable ones and generates download-ready PDFs.
+            it packages the full breakdown into a download-ready analysis report.
           </p>
-        </div>
+        </Reveal>
       </section>
 
       {/* How it works */}
@@ -646,24 +742,24 @@ function HomePage({ onLaunch }) {
           <div className="section-eyebrow">How it works</div>
           <div className="section-title">Three steps. One batch.</div>
           <div className="steps-grid">
-            <div className="step-card">
+            <Reveal index={0} className="step-card">
               <div className="step-card-num">01</div>
               <h3>Upload and screen</h3>
-              <p>Drop in the whole student batch — PDF and Word files both work. Paste the job description from any listing. Every CV gets scored 0 to 100 against the role.</p>
+              <p>Drop in the whole student batch. PDF and Word files both work. Paste the job description from any listing. Every CV gets scored 0 to 100 against the role.</p>
               <span className="step-card-tag tag-screen">Screening</span>
-            </div>
-            <div className="step-card">
+            </Reveal>
+            <Reveal index={1} className="step-card">
               <div className="step-card-num">02</div>
               <h3>Review the ranked list</h3>
-              <p>CVs are grouped into three tiers: strong fits above 70, worth improving between 50 and 70, and poor fits below 50. Strong fits show you exactly why they match.</p>
+              <p>CVs are grouped into three tiers: strong fits above 70, worth improving between 35 and 70, and poor fits below 35. Strong fits show you exactly why they match.</p>
               <span className="step-card-tag tag-review">Ranking</span>
-            </div>
-            <div className="step-card">
+            </Reveal>
+            <Reveal index={2} className="step-card">
               <div className="step-card-num">03</div>
-              <h3>Improve what needs it</h3>
-              <p>For each CV in the middle tier, click Improve. The AI rewrites it to better match the role, shows you the changes, and generates a PDF ready to submit.</p>
-              <span className="step-card-tag tag-improve">Improvement</span>
-            </div>
+              <h3>Download the report</h3>
+              <p>Get a single PDF with the full analysis from Step 2: every candidate's score, matched and missing keywords, and suggestions, grouped by tier and ready to share.</p>
+              <span className="step-card-tag tag-improve">Report</span>
+            </Reveal>
           </div>
         </div>
       </section>
@@ -674,47 +770,47 @@ function HomePage({ onLaunch }) {
           <div className="section-eyebrow">What you get</div>
           <div className="section-title">Everything a placement office needs.</div>
           <div className="features-grid">
-            <div className="feat-card">
-              <div className="feat-icon fi-g">📊</div>
+            <Reveal index={0} className="feat-card">
+              <div className="feat-icon">📊</div>
               <h3>0 to 100 match score per CV</h3>
-              <p>Each resume is scored against the specific job description you paste — not a generic rubric. The score reflects actual keyword overlap, relevant experience, and skill match.</p>
-            </div>
-            <div className="feat-card">
-              <div className="feat-icon fi-a">🎯</div>
+              <p>Each resume is scored against the specific job description you paste, not a generic rubric. The score reflects actual keyword overlap, relevant experience, and skill match.</p>
+            </Reveal>
+            <Reveal index={1} className="feat-card">
+              <div className="feat-icon">🎯</div>
               <h3>Three-tier ranking, instantly</h3>
               <p>Strong fits are highlighted and ready to forward. The middle tier shows you exactly what is missing and what to fix. Poor fits are flagged so you don't waste time on them.</p>
-            </div>
-            <div className="feat-card">
-              <div className="feat-icon fi-b">✏️</div>
+            </Reveal>
+            <Reveal index={2} className="feat-card">
+              <div className="feat-icon">✏️</div>
               <h3>Per-CV improvement suggestions</h3>
-              <p>For every partially-matching CV, you get a numbered list of specific, actionable edits — not vague advice. Then one click rewrites the whole resume automatically.</p>
-            </div>
-            <div className="feat-card">
-              <div className="feat-icon fi-c">📄</div>
-              <h3>Download-ready improved PDFs</h3>
-              <p>Every improved CV generates a clean, formatted PDF. Download them one by one or export a ZIP of the whole improved batch. No copy-pasting, no reformatting.</p>
-            </div>
+              <p>For every partially-matching CV, you get a numbered list of specific, actionable edits (not vague advice), plus the exact JD keywords it matched and missed.</p>
+            </Reveal>
+            <Reveal index={3} className="feat-card">
+              <div className="feat-icon">📄</div>
+              <h3>One downloadable analysis report</h3>
+              <p>The full screening breakdown (every candidate, every tier, every reason) exports as a single clean PDF. No copy-pasting, no reformatting.</p>
+            </Reveal>
           </div>
         </div>
       </section>
 
       {/* CTA */}
       <section className="cta-section">
-        <div className="cta-inner">
+        <Reveal className="cta-inner">
           <h2>Ready to screen your<br /><em>next placement batch?</em></h2>
           <p>No signup needed. Add your Anthropic API key to the backend and you're running.</p>
           <button className="btn-cta-white" onClick={onLaunch}>
             Open the tool
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 7h12M8 2l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
-        </div>
+        </Reveal>
       </section>
 
       {/* Footer */}
       <footer className="home-footer">
         <div className="home-footer-brand">
           <span className="brand-dot" style={{ background: 'rgba(255,255,255,0.3)' }} />
-          PlacementCV
+          Orca
         </div>
         <div className="home-footer-links">
           <span className="home-footer-link">Built for placement offices</span>
@@ -779,21 +875,20 @@ export default function App() {
       {step === 2 && screenResult && (
         <ResultsPage
           screenResult={screenResult}
-          onGoImprove={() => setStep(3)}
+          onGoReport={() => setStep(3)}
           onReset={reset}
         />
       )}
 
       {step === 3 && screenResult && (
-        <ImprovePage
+        <ReportPage
           screenResult={screenResult}
-          jd={jd}
           onBack={() => setStep(2)}
         />
       )}
 
       <footer className="footer">
-        <div className="footer-left"><span className="brand-dot" /> PlacementCV</div>
+        <div className="footer-left"><span className="brand-dot" /> Orca</div>
         <div className="footer-right">Powered by Claude AI</div>
       </footer>
     </div>
