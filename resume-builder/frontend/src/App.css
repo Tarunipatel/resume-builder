@@ -101,6 +101,7 @@ body {
   color: var(--text-primary);
   white-space: nowrap;
   flex-shrink: 0;
+  cursor: pointer;
 }
 .brand-dot {
   width: 8px; height: 8px;

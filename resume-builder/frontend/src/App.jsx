@@ -102,10 +102,16 @@ const STEPS = [
   { num: 3, label: 'Download Report' },
 ]
 
-function Topbar({ step, screenResult, onGoto }) {
+function Topbar({ step, screenResult, onGoto, onLogoClick }) {
   return (
     <header className="topbar">
-      <div className="topbar-brand">
+      <div
+        className="topbar-brand"
+        role="button"
+        tabIndex={0}
+        onClick={onLogoClick}
+        onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && onLogoClick()}
+      >
         <span className="brand-dot" />
         Orca
       </div>
@@ -823,7 +829,7 @@ function HomePage({ onLaunch }) {
 
 // ── App root ──────────────────────────────────────────────────────────
 export default function App() {
-  const [view, setView]               = useState('home')  // 'home' | 'tool'
+  const [view, setView]               = useState(() => window.location.pathname === '/tool' ? 'tool' : 'home')  // 'home' | 'tool'
   const [step, setStep]               = useState(1)
   const [files, setFiles]             = useState([])
   const [jd, setJd]                   = useState('')
@@ -831,7 +837,22 @@ export default function App() {
   const [progress, setProgress]       = useState(0)
   const [screenResult, setScreenResult] = useState(null)
 
-  const launchTool = () => { setView('tool'); window.scrollTo(0, 0) }
+  useEffect(() => {
+    const onPopState = () => setView(window.location.pathname === '/tool' ? 'tool' : 'home')
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  const launchTool = () => {
+    setView('tool')
+    window.history.pushState({}, '', '/tool')
+    window.scrollTo(0, 0)
+  }
+  const goHome = () => {
+    setView('home')
+    window.history.pushState({}, '', '/')
+    window.scrollTo(0, 0)
+  }
 
   const screen = async () => {
     if (!files.length || !jd.trim()) return
@@ -862,7 +883,7 @@ export default function App() {
 
   return (
     <div className="page">
-      <Topbar step={step} screenResult={screenResult} onGoto={setStep} />
+      <Topbar step={step} screenResult={screenResult} onGoto={setStep} onLogoClick={goHome} />
 
       {step === 1 && (
         <UploadPage
