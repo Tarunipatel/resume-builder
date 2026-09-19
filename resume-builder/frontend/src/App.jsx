@@ -818,7 +818,6 @@ function HomePage({ onLaunch }) {
         </div>
         <div className="home-footer-links">
           <span className="home-footer-link">Built for placement offices</span>
-          <span className="home-footer-link">Powered by Claude AI</span>
         </div>
       </footer>
     </div>
@@ -908,7 +907,6 @@ export default function App() {
 
       <footer className="footer">
         <div className="footer-left"><span className="brand-dot" /> Orca</div>
-        <div className="footer-right">Powered by Claude AI</div>
       </footer>
     </div>
   )
