@@ -573,13 +573,13 @@ body {
 }
 .home-hero-inner {
   max-width: var(--container); margin: 0 auto;
-  padding: clamp(4rem, 9vw, 6.5rem) var(--pad-x) clamp(3rem, 7vw, 5rem);
+  padding: clamp(5rem, 11vw, 8rem) var(--pad-x) clamp(4rem, 9vw, 6.5rem);
   display: grid; grid-template-columns: 1fr 1fr;
   gap: 80px; align-items: center;
 }
 @media (max-width: 820px) { .home-hero-inner { grid-template-columns: 1fr; gap: 40px; } }
 
-.hero-kicker { margin-bottom: 20px; }
+.hero-kicker { margin-bottom: 28px; }
 .home-h1 {
   font-family: 'Plus Jakarta Sans', sans-serif;
   font-size: clamp(3rem, 7vw, 6rem);
@@ -588,6 +588,18 @@ body {
   letter-spacing: -0.02em; margin-bottom: 24px;
 }
 .home-h1 em { font-style: normal; color: var(--gold-light); }
+.home-h1-orca {
+  display: block;
+  font-size: clamp(3.6rem, 9vw, 7rem);
+  color: var(--text-primary);
+}
+.home-h1-sub {
+  display: block;
+  font-size: clamp(1.2rem, 2.4vw, 1.8rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-top: 12px;
+}
 .home-hero-sub {
   font-size: 16px; color: var(--text-secondary);
   line-height: 1.8; margin-bottom: 32px; max-width: 440px;

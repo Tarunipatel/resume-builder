@@ -679,14 +679,12 @@ function HomePage({ onLaunch }) {
       <section className="home-hero">
         <div className="home-hero-inner">
           <div>
-            <span className="hero-kicker">For college placement offices</span>
             <h1 className="home-h1">
-              Screen 200 CVs.<br />
-              In the time it takes to<br />
-              <em>read one.</em>
+              <span className="home-h1-orca">Orca</span>
+              <em className="home-h1-sub">For Talent Hunters.</em>
             </h1>
             <p className="home-hero-sub">
-              Upload your student batch, paste a job description, and Orca
+              Upload profiles, paste a job description, and Orca
               scores every resume against the role, ranking them into three tiers so
               you know exactly where to focus.
             </p>
