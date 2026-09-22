@@ -142,7 +142,7 @@ function Topbar({ step, screenResult, onGoto, onLogoClick }) {
         })}
       </nav>
 
-      <div className="topbar-right">Placement office tool</div>
+      <div className="topbar-right">Recruiter tool</div>
     </header>
   )
 }
@@ -169,7 +169,7 @@ function UploadPage({ files, setFiles, jd, setJd, onScreen, loading, progress })
         <div className="page-eyebrow">Step 1 of 3</div>
         <h1 className="page-title">Upload CVs and <em>paste the job description</em></h1>
         <p className="page-sub">
-          Add the student resumes and the role you are hiring for. We will score each CV
+          Add the candidate resumes and the role you are hiring for. We will score each CV
           against the job description and rank them for you.
         </p>
       </div>
@@ -178,7 +178,7 @@ function UploadPage({ files, setFiles, jd, setJd, onScreen, loading, progress })
         <div className="card">
           <div className="card-head">
             <div className="card-step">Upload</div>
-            <h3>Student CVs</h3>
+            <h3>Candidate CVs</h3>
             <p>PDF or DOCX, up to 200 files at once</p>
           </div>
           <div className="card-body">
@@ -632,7 +632,7 @@ function ReportPage({ screenResult, onBack }) {
         <p>
           <strong>What's in the report:</strong> {strong.length} strong fit{strong.length !== 1 ? 's' : ''},{' '}
           {partial.length} worth improving, and {poor.length} poor fit{poor.length !== 1 ? 's' : ''},
-          each with the reasoning behind their score, ready to share with the placement team.
+          each with the reasoning behind their score, ready to share with the hiring team.
         </p>
       </div>
 
@@ -815,7 +815,7 @@ function HomePage({ onLaunch }) {
           <img src="/amphitrite-logo.png" alt="Amphitrite Labs" className="home-footer-logo" />
         </div>
         <div className="home-footer-links">
-          <span className="home-footer-link">Built for placement offices</span>
+          <span className="home-footer-link">Built for recruiters</span>
         </div>
       </footer>
     </div>

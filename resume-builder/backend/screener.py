@@ -2,14 +2,14 @@ import json
 import anthropic
 from models import ParsedCV, ScreenedCV, MatchLevel
 
-SYSTEM = "You are an expert recruiter helping a college placement cell screen student CVs against a job description. Respond with ONLY valid JSON."
+SYSTEM = "You are an expert recruiter screening candidate CVs against a job description. Respond with ONLY valid JSON."
 
-PROMPT = """Score this student's CV against the job description below.
+PROMPT = """Score this candidate's CV against the job description below.
 
 === JOB DESCRIPTION ===
 {job_description}
 
-=== STUDENT CV ===
+=== CANDIDATE CV ===
 {cv_text}
 
 Return this exact JSON structure:
@@ -26,14 +26,14 @@ Return this exact JSON structure:
 }}
 
 Scoring guide:
-- 70 to 100 (strong): Student has most required skills and relevant experience. Minor gaps only.
+- 70 to 100 (strong): Candidate has most required skills and relevant experience. Minor gaps only.
 - 35 to 69 (partial): Some relevant skills but clear gaps that are addressable through edits.
 - 0 to 34 (poor): Missing core requirements. Would need significant upskilling, not just a CV edit.
 
 why_strong should list 2-4 concrete things already in the CV that match the JD.
-suggestions should list 2-5 specific, actionable edits the student could make to improve their score.
+suggestions should list 2-5 specific, actionable edits the candidate could make to improve their score.
 matched_keywords should list the important JD terms (skills, tools, qualifications) that ARE present in the CV
-  and contributed positively to the score — this is what the student should point to as evidence of fit.
+  and contributed positively to the score — this is what the candidate should point to as evidence of fit.
 missing_keywords should list the important JD terms completely absent from this CV.
 """
 
