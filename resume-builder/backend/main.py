@@ -1,10 +1,12 @@
 import os
+import time
 import asyncio
 import io
+from collections import defaultdict, deque
 from typing import List
 
 import anthropic
-from fastapi import FastAPI, File, Form, UploadFile, HTTPException
+from fastapi import FastAPI, File, Form, Request, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
@@ -23,6 +25,14 @@ MOCK_MODE = os.getenv("MOCK_MODE", "false").lower() == "true"
 DEFAULT_ORIGINS = ["http://localhost:5173", "http://localhost:3000"]
 extra_origins = os.getenv("ALLOWED_ORIGINS", "")
 ALLOWED_ORIGINS = DEFAULT_ORIGINS + [o.strip() for o in extra_origins.split(",") if o.strip()]
+
+MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10MB per CV
+
+# Per-IP sliding-window limit on the costly (Claude-backed) screening endpoint.
+# In-memory only — fine for a single-process deployment like this one.
+RATE_LIMIT_WINDOW_SECONDS = 3600
+RATE_LIMIT_MAX_REQUESTS = 10
+_screen_request_log: dict[str, deque] = defaultdict(deque)
 
 app = FastAPI(title="Orca")
 
@@ -52,12 +62,35 @@ def extract_job_title(jd: str) -> str:
     return "Target Role"
 
 
+def get_client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def enforce_rate_limit(ip: str) -> None:
+    now = time.time()
+    log = _screen_request_log[ip]
+    while log and log[0] < now - RATE_LIMIT_WINDOW_SECONDS:
+        log.popleft()
+    if len(log) >= RATE_LIMIT_MAX_REQUESTS:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded — max {RATE_LIMIT_MAX_REQUESTS} screening requests per hour. Try again later.",
+        )
+    log.append(now)
+
+
 # ── Phase 1: Screen all CVs ──────────────────────────────────────────
 @app.post("/api/screen", response_model=BatchScreenResult)
 async def screen_cvs(
+    request: Request,
     job_description: str = Form(...),
     files: List[UploadFile] = File(...),
 ):
+    enforce_rate_limit(get_client_ip(request))
+
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded.")
     if len(files) > 200:
@@ -73,6 +106,10 @@ async def screen_cvs(
         async with semaphore:
             contents = await file.read()
             try:
+                if len(contents) > MAX_FILE_SIZE_BYTES:
+                    raise ValueError(
+                        f"File exceeds the {MAX_FILE_SIZE_BYTES // (1024 * 1024)}MB size limit."
+                    )
                 parsed = parse_cv(file.filename, contents)
                 if MOCK_MODE:
                     return mock_screen_cv(parsed, job_description)
