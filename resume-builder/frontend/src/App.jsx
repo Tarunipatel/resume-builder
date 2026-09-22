@@ -665,8 +665,7 @@ function HomePage({ onLaunch }) {
       {/* Nav */}
       <nav className="home-nav">
         <div className="home-nav-brand">
-          <span className="brand-dot" />
-          Orca
+          <img src="/amphitrite-logo.png" alt="Amphitrite Labs" className="home-nav-logo" />
         </div>
         <div className="home-nav-links">
           <button className="home-nav-link" onClick={() => document.getElementById('how').scrollIntoView({ behavior: 'smooth' })}>How it works</button>
@@ -726,10 +725,10 @@ function HomePage({ onLaunch }) {
       {/* Problem */}
       <section className="problem-section">
         <Reveal className="problem-inner">
-          <h2>Placement officers shouldn't have to<br /><em>read every CV by hand.</em></h2>
+          <h2>Recruiters shouldn't have to<br /><em>read every CV by hand.</em></h2>
           <p>
-            A typical placement batch has 40 to 80 students. A single company visit might
-            bring 3 different roles. That is up to 240 CV reads, before you have even
+            A single company visit might
+            bring 3 different roles across 80 candidates. That is up to 240 CV reads, before you have even
             shortlisted anyone.
           </p>
           <p>
@@ -749,7 +748,7 @@ function HomePage({ onLaunch }) {
             <Reveal index={0} className="step-card">
               <div className="step-card-num">01</div>
               <h3>Upload and screen</h3>
-              <p>Drop in the whole student batch. PDF and Word files both work. Paste the job description from any listing. Every CV gets scored 0 to 100 against the role.</p>
+              <p>Drop in the folder. PDF and Word files both work. Paste the job description from any listing. Every CV gets scored 0 to 100 against the role.</p>
               <span className="step-card-tag tag-screen">Screening</span>
             </Reveal>
             <Reveal index={1} className="step-card">
@@ -772,7 +771,7 @@ function HomePage({ onLaunch }) {
       <section className="features-section" id="features">
         <div className="features-inner">
           <div className="section-eyebrow">What you get</div>
-          <div className="section-title">Everything a placement office needs.</div>
+          <div className="section-title">Everything a recruiter needs.</div>
           <div className="features-grid">
             <Reveal index={0} className="feat-card">
               <div className="feat-icon">📊</div>
@@ -801,8 +800,8 @@ function HomePage({ onLaunch }) {
       {/* CTA */}
       <section className="cta-section">
         <Reveal className="cta-inner">
-          <h2>Ready to screen your<br /><em>next placement batch?</em></h2>
-          <p>No signup needed. Add your Anthropic API key to the backend and you're running.</p>
+          <h2>Ready to screen your<br /><em>next batch of CVs?</em></h2>
+          <p>No signup needed.</p>
           <button className="btn-cta-white" onClick={onLaunch}>
             Open the tool
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 7h12M8 2l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -813,8 +812,7 @@ function HomePage({ onLaunch }) {
       {/* Footer */}
       <footer className="home-footer">
         <div className="home-footer-brand">
-          <span className="brand-dot" style={{ background: 'rgba(255,255,255,0.3)' }} />
-          Orca
+          <img src="/amphitrite-logo.png" alt="Amphitrite Labs" className="home-footer-logo" />
         </div>
         <div className="home-footer-links">
           <span className="home-footer-link">Built for placement offices</span>
